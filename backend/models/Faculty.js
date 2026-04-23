@@ -1,10 +1,25 @@
 const mongoose = require('mongoose');
 
 const FacultySchema = new mongoose.Schema({
+    employeeId: {
+        type: String,
+        unique: true,
+        sparse: true,
+        trim: true
+    },
     name: {
         type: String,
         required: [true, 'Please add a faculty name'],
         trim: true
+    },
+    designation: {
+        type: String,
+        enum: ['Professor & HOD', 'Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer'],
+        default: 'Assistant Professor'
+    },
+    qualifications: {
+        type: String,
+        default: ''
     },
     department: {
         type: String,
@@ -14,12 +29,17 @@ const FacultySchema = new mongoose.Schema({
         type: [String],
         required: true
     },
+    email: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: ''
+    },
     maxWeeklyLoad: {
         type: Number,
         default: 16
     },
     availability: {
-        // Simple mapping of Day: [Hours] or specialized constraint object
         type: Object,
         default: {
             Mon: true, Tue: true, Wed: true, Thu: true, Fri: true, Sat: true
@@ -27,8 +47,7 @@ const FacultySchema = new mongoose.Schema({
     },
     user: {
         type: mongoose.Schema.ObjectId,
-        ref: 'User',
-        required: true
+        ref: 'User'
     },
     createdAt: {
         type: Date,

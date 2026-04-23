@@ -11,7 +11,8 @@ import {
   X,
   LayoutDashboard,
   Moon,
-  Sun
+  Sun,
+  Wand2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/dashboard/Header';
@@ -27,6 +28,7 @@ const DashboardLayout = () => {
 
   const navItems = [
     { title: 'Timetable Grid', icon: CalendarDays, href: '/dashboard' },
+    { title: 'Generate Wizard', icon: Wand2, href: '/dashboard/generate', roles: ['admin', 'hod'] },
     { title: 'Faculty Management', icon: Users, href: '/dashboard/faculty', roles: ['admin', 'hod'] },
     { title: 'Room Allocation', icon: MapPin, href: '/dashboard/rooms', roles: ['admin'] },
     { title: 'Settings', icon: Settings, href: '/dashboard/settings' },

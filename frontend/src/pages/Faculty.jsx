@@ -212,29 +212,41 @@ const FacultyPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Department</TableHead>
+                <TableHead>Designation</TableHead>
                 <TableHead>Specialization</TableHead>
-                <TableHead>Weekly Load</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Qualifications</TableHead>
+                <TableHead>Load</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredFaculty.length > 0 ? (
                 filteredFaculty.map((faculty) => (
-                  <TableRow key={faculty.id} className="hover:bg-muted/50">
-                    <TableCell className="font-medium">{faculty.name}</TableCell>
-                    <TableCell>{faculty.department}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {Array.isArray(faculty.specialization) ? faculty.specialization.join(', ') : faculty.specialization}
-                    </TableCell>
-                    <TableCell><Badge variant="outline">{faculty.maxWeeklyLoad || faculty.loads} hrs</Badge></TableCell>
+                  <TableRow key={faculty._id || faculty.id} className="hover:bg-muted/50">
+                    <TableCell className="text-muted-foreground text-xs font-mono">{faculty.employeeId || '—'}</TableCell>
                     <TableCell>
-                      <Badge className={statusColors[faculty.status || 'Available'] || 'bg-gray-100'}>
-                        {faculty.status || 'Available'}
+                      <div>
+                        <p className="font-medium">{faculty.name}</p>
+                        <p className="text-xs text-muted-foreground">{faculty.email}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={
+                        faculty.designation === 'Professor & HOD' ? 'border-amber-400 text-amber-700 bg-amber-50' :
+                        faculty.designation === 'Professor' ? 'border-blue-400 text-blue-700 bg-blue-50' :
+                        faculty.designation === 'Associate Professor' ? 'border-purple-400 text-purple-700 bg-purple-50' :
+                        'border-gray-300'
+                      }>
+                        {faculty.designation || 'Assistant Professor'}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[200px]">
+                      {Array.isArray(faculty.specialization) ? faculty.specialization.join(', ') : faculty.specialization}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{faculty.qualifications || '—'}</TableCell>
+                    <TableCell><Badge variant="outline">{faculty.maxWeeklyLoad || 16} hrs</Badge></TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button variant="ghost" size="sm" onClick={() => handleOpenEditModal(faculty)}>

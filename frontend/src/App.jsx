@@ -8,6 +8,7 @@ import DashboardPage from '@/pages/Dashboard';
 import FacultyPage from '@/pages/Faculty';
 import RoomsPage from '@/pages/Rooms';
 import SettingsPage from '@/pages/Settings';
+import GenerateWizard from '@/pages/GenerateWizard';
 
 import ProtectedRoute from '@/components/ProtectedRoute';
 
@@ -31,6 +32,9 @@ function App() {
                 <Route path="rooms" element={<RoomsPage />} />
               </Route>
               <Route path="settings" element={<SettingsPage />} />
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'hod']} />}>
+                <Route path="generate" element={<GenerateWizard />} />
+              </Route>
             </Route>
           </Route>
 
