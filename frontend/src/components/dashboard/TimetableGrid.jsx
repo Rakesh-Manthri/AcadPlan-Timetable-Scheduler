@@ -23,23 +23,35 @@ const TimetableGrid = ({ courses = [] }) => {
     window.print();
   };
 
+  // Map grid timeIdx (0-6, with 3=lunch) to solver slot_idx (0-5, no lunch)
+  const gridToSolverIdx = (timeIdx) => {
+    if (timeIdx < 3) return timeIdx;       // First half: 0,1,2
+    if (timeIdx === 3) return -1;           // Lunch break
+    return timeIdx - 1;                     // Second half: 4->3, 5->4, 6->5
+  };
+
   // Logic to find if a slot has a course
   const getSlotCourse = (day, timeIdx) => {
+    const solverIdx = gridToSolverIdx(timeIdx);
+    if (solverIdx === -1) return null;
     return courses.find(c => {
       const matchDay = c.day === day || c.day.startsWith(day);
       const sIdx = c.startTimeIdx !== undefined ? c.startTimeIdx : c.slot_idx;
-      return matchDay && sIdx === timeIdx;
+      return matchDay && sIdx === solverIdx;
     });
   };
 
   // Logic to check if an index is part of a spanning course (Lab etc)
   const isPartOfSpan = (day, timeIdx) => {
+    const solverIdx = gridToSolverIdx(timeIdx);
+    if (solverIdx === -1) return false;
     return courses.some(c => {
       const matchDay = c.day === day || c.day.startsWith(day);
       const sIdx = c.startTimeIdx !== undefined ? c.startTimeIdx : c.slot_idx;
-      return matchDay && timeIdx > sIdx && timeIdx < sIdx + (c.span || 1);
+      return matchDay && solverIdx > sIdx && solverIdx < sIdx + (c.span || 1);
     });
   };
+
 
   return (
     <div className="w-full">

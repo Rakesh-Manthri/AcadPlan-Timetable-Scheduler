@@ -41,6 +41,11 @@ class BranchSolver:
         self.slots = [s for s in config['schedule']['slots'] if not s['is_break']]
         self.global_fixed = config['schedule'].get('fixed_sessions', [])
 
+        # Valid lab start positions (2 consecutive slots, must NOT cross lunch)
+        # First half: slot 0+1, 1+2  |  Second half: slot 3+4, 4+5
+        # Slot 2+3 is FORBIDDEN (crosses lunch break)
+        self.VALID_LAB_STARTS = [0, 1, 3, 4]
+
         # Grid: { "Y3-A": [list of slot assignments], ... }
         self.grids = {}
         for y in years:
@@ -88,28 +93,43 @@ class BranchSolver:
     def wave1_fixed(self):
         """Place fixed classes. These are absolute anchors."""
         for fc in self.fixed_classes:
-            day = fc.get('day')
-            slot_idx = fc.get('slot_idx', fc.get('slotIdx', 0))
             subject = fc.get('subject', 'Fixed Class')
-            faculty = fc.get('faculty', '')
             room = fc.get('room', '')
             target_years = fc.get('years', self.years)
             target_sections = fc.get('sections', ['ALL'])
+            base_faculty = fc.get('faculty', '')
 
-            for y in target_years:
-                for sec in self.sections:
-                    if 'ALL' in target_sections or sec in target_sections:
-                        grid_key = f"Y{y}-{sec}"
-                        if grid_key in self.grids:
-                            entry = {
-                                'day': day, 'slot_idx': slot_idx,
-                                'subject': subject, 'faculty': faculty,
-                                'room': room, 'type': 'Fixed',
-                                'year': y, 'section': sec
-                            }
-                            self.grids[grid_key].append(entry)
-                            if room:
-                                self._reserve(day, slot_idx, room, faculty)
+            # Support for multiple slots per fixed class
+            slots_to_fix = fc.get('slots', [])
+            if not slots_to_fix and 'day' in fc:
+                slots_to_fix = [{'day': fc['day'], 'slot_idx': fc.get('slot_idx', 0)}]
+
+            for s in slots_to_fix:
+                day = s['day']
+                slot_idx = int(s.get('slot_idx', 0))
+
+                for y in target_years:
+                    for sec in self.sections:
+                        if 'ALL' in target_sections or sec in target_sections:
+                            grid_key = f"Y{y}-{sec}"
+                            if grid_key in self.grids:
+                                # Dynamically map the correct faculty for this specific section
+                                section_faculty = base_faculty
+                                if 'ALL' in target_sections:
+                                    for m in self.subject_mappings:
+                                        if m['subject'] == subject and m.get('year') == y and m.get('section') == sec:
+                                            section_faculty = m['faculty']
+                                            break
+
+                                entry = {
+                                    'day': day, 'slot_idx': slot_idx,
+                                    'subject': subject, 'faculty': section_faculty,
+                                    'room': room, 'type': 'Fixed',
+                                    'year': y, 'section': sec
+                                }
+                                self.grids[grid_key].append(entry)
+                                if room and section_faculty:
+                                    self._reserve(day, slot_idx, room, section_faculty)
 
     # ========================================================
     # WAVE 2: Alternate Classes
@@ -168,6 +188,14 @@ class BranchSolver:
         """Count faculty hours on a specific day in a grid."""
         return sum(1 for e in self.grids[grid_key]
                    if e['day'] == day and e['faculty'] == faculty)
+
+    def _count_daily_labs(self, grid_key, day):
+        """Count how many distinct lab sessions are on a given day in a grid."""
+        lab_subjects = set()
+        for e in self.grids[grid_key]:
+            if e['day'] == day and e['type'] == 'Lab':
+                lab_subjects.add(e['subject'])
+        return len(lab_subjects)
 
     def wave3_normals(self):
         """Use backtracking to fill remaining normal subjects."""
@@ -247,6 +275,14 @@ class BranchSolver:
                         continue
 
                     if course_type == 'Lab':
+                        # Constraint: Labs only in first half or second half (no crossing lunch)
+                        if s_idx not in self.VALID_LAB_STARTS:
+                            continue
+
+                        # Constraint: Max one lab per day per section
+                        if self._count_daily_labs(grid_key, day) >= 1:
+                            continue
+
                         # Labs need 2 consecutive slots
                         if s_idx + 1 >= len(self.slots):
                             continue
@@ -361,6 +397,7 @@ class TimetableSolver:
         self.days = config['schedule']['days']
         self.slots = [s for s in config['schedule']['slots'] if not s['is_break']]
         self.fixed_sessions = config['schedule'].get('fixed_sessions', [])
+        self.VALID_LAB_STARTS = [0, 1, 3, 4]  # No crossing lunch break
 
     def is_consistent(self, assignment, course, day, slot_idx, room):
         for fs in self.fixed_sessions:
@@ -410,6 +447,13 @@ class TimetableSolver:
 
                     if self.is_consistent(assignment, course, day, s_idx, room):
                         if course['type'] == 'Lab':
+                            # Lab half-day constraint
+                            if s_idx not in self.VALID_LAB_STARTS:
+                                continue
+                            # Max one lab per day
+                            daily_labs = set(a['subject'] for a in assignment if a['day'] == day and a['type'] == 'Lab')
+                            if len(daily_labs) >= 1:
+                                continue
                             if s_idx + 1 >= len(self.slots) or not self.is_consistent(assignment, course, day, s_idx + 1, room):
                                 continue
                             assignment.append({'day': day, 'slot_idx': s_idx, 'subject': course['subject'], 'faculty': course['faculty'], 'room': room['roomId'], 'type': 'Lab'})

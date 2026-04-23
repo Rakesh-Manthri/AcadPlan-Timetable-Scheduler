@@ -14,6 +14,7 @@ const auth = require('./routes/auth');
 const faculty = require('./routes/faculty');
 const rooms = require('./routes/rooms');
 const timetable = require('./routes/timetable');
+const courses = require('./routes/courses');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/auth', auth);
 app.use('/api/faculty', faculty);
 app.use('/api/rooms', rooms);
 app.use('/api/timetable', timetable);
+app.use('/api/courses', courses);
 
 // Basic Route
 app.get('/', (req, res) => {

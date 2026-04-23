@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import scheduleService from '@/services/timetableService';
 import facultyService from '@/services/facultyService';
+import courseService from '@/services/courseService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,13 +15,29 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  Wand2, Plus, Trash2, Lock, RotateCcw, BookOpen, ChevronRight, ChevronLeft, Loader2
+  Wand2, Plus, Trash2, Lock, RotateCcw, BookOpen, ChevronRight, ChevronLeft, Loader2, Download
 } from 'lucide-react';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const SLOT_LABELS = [
   '09:40-10:40', '10:40-11:40', '11:40-12:40',
+  'LUNCH',
   '13:20-14:20', '14:20-15:20', '15:20-16:20'
+];
+const solverIdxFromGrid = (gridIdx) => {
+  if (gridIdx < 3) return gridIdx;
+  if (gridIdx === 3) return -1; // lunch
+  return gridIdx - 1;
+};
+
+// For Fixed/Alternate class slot selectors (solver indices 0-5)
+const SOLVER_SLOT_OPTIONS = [
+  { label: '09:40-10:40', value: '0' },
+  { label: '10:40-11:40', value: '1' },
+  { label: '11:40-12:40', value: '2' },
+  { label: '13:20-14:20', value: '3' },
+  { label: '14:20-15:20', value: '4' },
+  { label: '15:20-16:20', value: '5' },
 ];
 
 const LOADING_QUOTES = [
@@ -40,6 +57,8 @@ const GenerateWizard = () => {
   const [result, setResult] = useState(null);
   const [bottleneck, setBottleneck] = useState(null);
   const [dbFaculty, setDbFaculty] = useState([]);
+  const [dbCourses, setDbCourses] = useState({});
+  const [selectedSemester, setSelectedSemester] = useState('');
 
   // ---- STEP 1: Subject-Faculty Mapping ----
   const [subjectMappings, setSubjectMappings] = useState([
@@ -59,13 +78,17 @@ const GenerateWizard = () => {
   const [sections, setSections] = useState(['A']);
 
   useEffect(() => {
-    const fetchFaculty = async () => {
+    const fetchData = async () => {
       try {
-        const res = await facultyService.getAll();
-        setDbFaculty(res.data || []);
+        const [facRes, courseRes] = await Promise.all([
+          facultyService.getAll(),
+          courseService.getBySemester('IT')
+        ]);
+        setDbFaculty(facRes.data || []);
+        setDbCourses(courseRes.data || {});
       } catch (e) { /* ignore */ }
     };
-    fetchFaculty();
+    fetchData();
   }, []);
 
   // Rotate loading quotes
@@ -91,6 +114,29 @@ const GenerateWizard = () => {
     setSubjectMappings(updated);
   };
 
+  // ---- Auto-fill from Semester ----
+  const handleSemesterAutoFill = (sem) => {
+    setSelectedSemester(sem);
+    const courses = dbCourses[sem];
+    if (!courses || courses.length === 0) {
+      toast.error(`No courses found for Semester ${sem}`);
+      return;
+    }
+    // Map semester number to year: sem 1,2 -> year 1; sem 3,4 -> year 2; sem 5,6 -> year 3; sem 7,8 -> year 4
+    const yearMap = { 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4 };
+    const year = yearMap[sem] || 3;
+    const mapped = courses.map(c => ({
+      subject: c.name,
+      faculty: '',
+      weeklyHours: c.weeklyHours,
+      type: c.type,
+      year,
+      section: 'A'
+    }));
+    setSubjectMappings(mapped);
+    toast.success(`Loaded ${mapped.length} courses from Semester ${sem}`);
+  };
+
   // ---- Fixed Class Handlers ----
   const addFixedClass = () => {
     setFixedClasses([...fixedClasses, { subject: '', day: 'Monday', slot_idx: 0, years: [2, 3, 4], sections: ['ALL'], faculty: '', room: '' }]);
@@ -101,9 +147,21 @@ const GenerateWizard = () => {
   const updateFixedClass = (idx, field, value) => {
     const updated = [...fixedClasses];
     if (field === 'slot_idx') value = parseInt(value);
-    if (field === 'years') value = value.split(',').map(v => parseInt(v.trim()));
+    if (field === 'years') value = value.split(',').map(v => parseInt(v.trim()) || v);
     if (field === 'sections') value = value.split(',').map(v => v.trim());
+    
     updated[idx][field] = value;
+    
+    // Auto-fill faculty, year, and section based on selected mapping
+    if (field === 'subject') {
+      const mapping = subjectMappings.find(m => m.subject === value);
+      if (mapping) {
+        updated[idx].faculty = mapping.faculty || '';
+        updated[idx].years = [mapping.year];
+        updated[idx].sections = ['ALL']; // Default to ALL sections so Open Electives apply globally
+      }
+    }
+    
     setFixedClasses(updated);
   };
 
@@ -214,9 +272,23 @@ const GenerateWizard = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5" /> Subject-Faculty Mapping</CardTitle>
-            <CardDescription>Define which subjects are taught by which faculty, and how many hours per week.</CardDescription>
+            <CardDescription>Pick a semester to auto-fill from the curriculum, then assign faculty.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Semester Quick-Fill */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Label className="text-sm font-medium">Auto-fill from Semester:</Label>
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+                <Button
+                  key={sem}
+                  variant={selectedSemester === String(sem) ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleSemesterAutoFill(String(sem))}
+                >
+                  Sem {sem}
+                </Button>
+              ))}
+            </div>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -258,6 +330,7 @@ const GenerateWizard = () => {
                         <Select value={String(row.year)} onValueChange={v => updateSubjectRow(idx, 'year', v)}>
                           <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="1">1st</SelectItem>
                             <SelectItem value="2">2nd</SelectItem>
                             <SelectItem value="3">3rd</SelectItem>
                             <SelectItem value="4">4th</SelectItem>
@@ -301,8 +374,15 @@ const GenerateWizard = () => {
               <Card key={idx} className="border-dashed">
                 <CardContent className="pt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
-                    <Label>Subject</Label>
-                    <Input value={fc.subject} onChange={e => updateFixedClass(idx, 'subject', e.target.value)} placeholder="e.g. Open Elective" />
+                    <Label>Subject (From Step 1)</Label>
+                    <Select value={fc.subject} onValueChange={v => updateFixedClass(idx, 'subject', v)}>
+                      <SelectTrigger><SelectValue placeholder="Select mapped subject" /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from(new Set(subjectMappings.filter(m => m.subject).map(m => m.subject))).map(sub => (
+                          <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label>Day</Label>
@@ -315,7 +395,7 @@ const GenerateWizard = () => {
                     <Label>Time Slot</Label>
                     <Select value={String(fc.slot_idx)} onValueChange={v => updateFixedClass(idx, 'slot_idx', v)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{SLOT_LABELS.map((s, i) => <SelectItem key={i} value={String(i)}>{s}</SelectItem>)}</SelectContent>
+                      <SelectContent>{SOLVER_SLOT_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div>
@@ -370,7 +450,7 @@ const GenerateWizard = () => {
                     <Label>Time Slot</Label>
                     <Select value={String(alt.slot_idx)} onValueChange={v => updateAlternateClass(idx, 'slot_idx', v)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{SLOT_LABELS.map((s, i) => <SelectItem key={i} value={String(i)}>{s}</SelectItem>)}</SelectContent>
+                      <SelectContent>{SOLVER_SLOT_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div>
@@ -516,8 +596,17 @@ const GenerateWizard = () => {
                       {DAYS.map(day => (
                         <tr key={day}>
                           <td className="p-2 border font-semibold bg-muted/20">{day.slice(0, 3)}</td>
-                          {SLOT_LABELS.map((_, slotIdx) => {
-                            const entry = entries.find(e => e.day === day && e.slot_idx === slotIdx);
+                          {SLOT_LABELS.map((slotLabel, gridIdx) => {
+                            // Handle lunch break column
+                            if (gridIdx === 3) {
+                              return (
+                                <td key={gridIdx} className="p-1.5 border text-center bg-secondary/30 italic text-muted-foreground text-[10px] tracking-wide">
+                                  🍽️
+                                </td>
+                              );
+                            }
+                            const sIdx = solverIdxFromGrid(gridIdx);
+                            const entry = entries.find(e => e.day === day && e.slot_idx === sIdx);
                             const bgColor = entry
                               ? entry.type === 'Fixed' ? 'bg-amber-100 dark:bg-amber-900/30'
                               : entry.type === 'Alternate' ? 'bg-purple-100 dark:bg-purple-900/30'
@@ -526,7 +615,7 @@ const GenerateWizard = () => {
                               : 'bg-sky-50 dark:bg-sky-900/20'
                               : '';
                             return (
-                              <td key={slotIdx} className={`p-1.5 border text-center ${bgColor}`}>
+                              <td key={gridIdx} className={`p-1.5 border text-center ${bgColor}`}>
                                 {entry ? (
                                   <div>
                                     <p className="font-semibold leading-tight">{entry.subject}</p>

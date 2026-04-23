@@ -8,6 +8,7 @@
     "dev": "nodemon index.js",
     "data:import": "node seeder.js",
     "seed:faculty": "node seeders/facultySeeder.js",
+    "seed:courses": "node seeders/courseSeeder.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
