@@ -1,5 +1,5 @@
 {
-    "institution": "Vasavi College of Engineering",
+    "institution_name": "Vasavi College of Engineering",
     "academic_year": "2025-26",
     "semester": "Even",
     "schedule": {
@@ -11,14 +11,21 @@
             {"id": 4, "start": "12:40", "end": "13:20", "type": "Lunch Break", "is_break": true},
             {"id": 5, "start": "13:20", "end": "14:20", "type": "Theory/Lab", "is_break": false},
             {"id": 6, "start": "14:20", "end": "15:20", "type": "Theory/Lab", "is_break": false},
-            {"id": 7, "start": "15:20", "end": "16:20", "type": "Theory/Special/Lab", "is_break": false}
+            {"id": 7, "start": "15:20", "end": "16:20", "type": "Theory/Special", "is_break": false}
         ],
-        "default_lab_duration": 120,
-        "default_theory_duration": 60
-    },
-    "faculty_constraints": {
-        "max_teaching_hours_per_day": 4,
-        "max_teaching_hours_per_week": 20,
-        "min_break_between_classes": 0
+        "fixed_sessions": [
+            {
+                "day": "Monday",
+                "slot_idx": 2,
+                "subject": "Mentor Session",
+                "type": "Special"
+            },
+            {
+                "day": "Saturday",
+                "slot_idx": 5,
+                "subject": "Sports Session",
+                "type": "Special"
+            }
+        ]
     }
 }

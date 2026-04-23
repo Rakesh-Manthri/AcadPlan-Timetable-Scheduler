@@ -13,6 +13,7 @@ connectDB();
 const auth = require('./routes/auth');
 const faculty = require('./routes/faculty');
 const rooms = require('./routes/rooms');
+const timetable = require('./routes/timetable');
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use(cors());
 app.use('/api/auth', auth);
 app.use('/api/faculty', faculty);
 app.use('/api/rooms', rooms);
+app.use('/api/timetable', timetable);
 
 // Basic Route
 app.get('/', (req, res) => {

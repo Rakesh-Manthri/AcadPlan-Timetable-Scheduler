@@ -9,14 +9,21 @@ import {
   LogOut, 
   Menu, 
   X,
-  LayoutDashboard
+  LayoutDashboard,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Header from '@/components/dashboard/Header';
+
+import authService from '@/services/authService';
 
 const DashboardLayout = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const navigate = useNavigate();
-  const role = localStorage.getItem('user_role') || 'faculty';
+  const user = authService.getCurrentUser();
+  const role = user?.role || 'faculty';
 
   const navItems = [
     { title: 'Timetable Grid', icon: CalendarDays, href: '/dashboard' },
@@ -30,12 +37,16 @@ const DashboardLayout = () => {
   );
 
   const handleLogout = () => {
-    localStorage.removeItem('user_role');
+    authService.logout();
     navigate('/');
   };
 
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className={cn("flex h-screen bg-background overflow-hidden", isDarkMode && 'dark')}>
       {/* Mobile Sidebar Overlay */}
       {!isSidebarOpen && (
         <Button 
@@ -50,7 +61,7 @@ const DashboardLayout = () => {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border transition-transform duration-300 ease-in-out lg:static lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 no-print",
         !isSidebarOpen && "-translate-x-full lg:hidden"
       )}>
         <div className="flex flex-col h-full">
@@ -92,21 +103,43 @@ const DashboardLayout = () => {
             ))}
           </nav>
 
-          {/* Profile/Logout Section */}
-          <div className="p-4 border-t border-border">
-            <div className="flex items-center gap-3 px-3 py-2 mb-4 bg-secondary/50 rounded-lg">
+          {/* Theme and Profile Section */}
+          <div className="p-4 border-t border-border space-y-3">
+            {/* Theme Toggle */}
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-sm"
+              onClick={toggleTheme}
+            >
+              {isDarkMode ? (
+                <>
+                  <Sun className="mr-2 h-4 w-4" />
+                  Light Mode
+                </>
+              ) : (
+                <>
+                  <Moon className="mr-2 h-4 w-4" />
+                  Dark Mode
+                </>
+              )}
+            </Button>
+
+            {/* Profile Card */}
+            <div className="flex items-center gap-3 px-3 py-2 bg-secondary/50 rounded-lg">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                {role[0].toUpperCase()}
+                {user?.name?.[0] || 'U'}
               </div>
               <div className="overflow-hidden">
                 <p className="text-sm font-semibold truncate leading-none mb-1">
-                  {role.charAt(0).toUpperCase() + role.slice(1)} User
+                  {user?.name || 'User'}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {role}@acadplan.edu
+                  {user?.email || 'user@acadplan.edu'}
                 </p>
               </div>
             </div>
+
+            {/* Logout Button */}
             <Button 
               variant="ghost" 
               className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
@@ -121,10 +154,11 @@ const DashboardLayout = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-16 flex items-center justify-between px-8 bg-card border-b border-border lg:hidden">
-           <span className="text-lg font-bold">AcadPlan</span>
-        </header>
-        <div className="flex-1 overflow-y-auto p-8">
+        {/* Header for Desktop and Mobile */}
+        <Header onLogout={handleLogout} />
+        
+        {/* Page Content */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <Outlet />
         </div>
       </main>

@@ -15,19 +15,30 @@ const TIME_SLOTS = [
   '03:20 - 04:20',
 ];
 
+import { Printer, Download, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
 const TimetableGrid = ({ courses = [] }) => {
+  const handlePrint = () => {
+    window.print();
+  };
+
   // Logic to find if a slot has a course
   const getSlotCourse = (day, timeIdx) => {
-    return courses.find(c => c.day === day && c.startTimeIdx === timeIdx);
+    return courses.find(c => {
+      const matchDay = c.day === day || c.day.startsWith(day);
+      const sIdx = c.startTimeIdx !== undefined ? c.startTimeIdx : c.slot_idx;
+      return matchDay && sIdx === timeIdx;
+    });
   };
 
   // Logic to check if an index is part of a spanning course (Lab etc)
   const isPartOfSpan = (day, timeIdx) => {
-    return courses.some(c => 
-      c.day === day && 
-      timeIdx > c.startTimeIdx && 
-      timeIdx < c.startTimeIdx + (c.span || 1)
-    );
+    return courses.some(c => {
+      const matchDay = c.day === day || c.day.startsWith(day);
+      const sIdx = c.startTimeIdx !== undefined ? c.startTimeIdx : c.slot_idx;
+      return matchDay && timeIdx > sIdx && timeIdx < sIdx + (c.span || 1);
+    });
   };
 
   return (
@@ -37,7 +48,10 @@ const TimetableGrid = ({ courses = [] }) => {
           <h1 className="text-2xl font-bold text-foreground">Weekly Timetable</h1>
           <p className="text-muted-foreground">Information Technology - Section B</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4 no-print">
+          <Button variant="outline" size="sm" className="gap-2" onClick={handlePrint}>
+            <Printer className="h-4 w-4" /> Print
+          </Button>
           <Badge variant="outline" className="px-3 py-1 bg-secondary border-border">
             Academic Year: 2025-26
           </Badge>
