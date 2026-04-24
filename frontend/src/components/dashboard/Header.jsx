@@ -1,51 +1,33 @@
 import React from 'react';
-import { Bell, Search, User, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import authService from '@/services/authService';
 
-const Header = ({ onLogout, userName = 'Faculty Member' }) => {
-  const [notifications] = React.useState(3);
+const Header = ({ onLogout }) => {
+  const user = authService.getCurrentUser();
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 bg-card border-b border-border no-print">
-      <div className="flex items-center flex-1 gap-4">
-        <div className="relative hidden md:block max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input 
-            placeholder="Search timetable, faculty, rooms..." 
-            className="pl-9 bg-muted border-muted-foreground/20"
-          />
-        </div>
-      </div>
-
+    <header className="sticky top-0 z-30 flex items-center justify-end h-16 px-8 bg-background/80 backdrop-blur-md border-b border-border/50 no-print">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          {notifications > 0 && (
-            <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs">
-              {notifications}
-            </Badge>
-          )}
-        </Button>
-
-        <div className="flex items-center gap-2 pl-4 border-l border-border">
+        <div className="flex items-center gap-3 pr-4 border-r border-border/50">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium leading-none">{userName}</p>
-            <p className="text-xs text-muted-foreground">Faculty</p>
+            <p className="text-sm font-semibold leading-none">{user?.name || 'Faculty Member'}</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1 font-bold">{user?.role || 'Faculty'}</p>
           </div>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <User className="h-5 w-5" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={onLogout}
-            title="Logout"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-sm font-bold text-primary">
+            {user?.name?.[0] || 'U'}
+          </div>
         </div>
+        
+        <Button 
+          variant="ghost" 
+          size="sm"
+          className="text-muted-foreground hover:text-destructive transition-colors gap-2"
+          onClick={onLogout}
+        >
+          <LogOut className="h-4 w-4" />
+          <span className="hidden sm:inline">Sign Out</span>
+        </Button>
       </div>
     </header>
   );

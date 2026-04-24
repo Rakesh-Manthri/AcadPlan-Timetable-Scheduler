@@ -115,7 +115,7 @@ exports.saveConstraints = async (req, res) => {
 // @access  Private/Admin
 exports.generateBranchSchedule = async (req, res) => {
     try {
-        const { department, academicYear, semester, years, sections, subjectMappings } = req.body;
+        const { department, academicYear, semester, years, sections, subjectMappings, sectionHalls } = req.body;
 
         // Fetch live resources
         const faculties = await Faculty.find();
@@ -127,9 +127,11 @@ exports.generateBranchSchedule = async (req, res) => {
         }
 
         // Save request as a record
+        const versionName = `Run - ${new Date().toLocaleString()}`;
         const scheduleRequest = await GlobalScheduleRequest.create({
             department, academicYear, semester, years, sections, subjectMappings,
-            status: 'pending',
+            status: 'draft', // Generated schedules start as draft
+            versionName,
             generatedBy: req.user.id
         });
 
@@ -142,25 +144,15 @@ exports.generateBranchSchedule = async (req, res) => {
             alternateClasses: constraints.alternateClasses || [],
             resourceCaps: constraints.resourceCaps || { lectureHalls: 5, labs: 3 },
             years,
-            sections
+            sections,
+            sectionHalls: sectionHalls || {}
         }, { timeout: 60000 }); // 60s timeout for complex solves
 
         if (pythonResponse.data.status === 'success') {
             // Update the request record
-            scheduleRequest.status = 'generated';
+            scheduleRequest.status = 'draft';
             scheduleRequest.result = pythonResponse.data.data;
             await scheduleRequest.save();
-
-            // Save each year/section as individual timetables
-            const savedTimetables = [];
-            for (const [key, schedule] of Object.entries(pythonResponse.data.data)) {
-                const tt = await Timetable.create({
-                    academicYear, semester, department,
-                    schedule: schedule,
-                    generatedBy: req.user.id
-                });
-                savedTimetables.push({ key, timetable: tt });
-            }
 
             res.status(201).json({ 
                 success: true, 
@@ -199,6 +191,175 @@ exports.getScheduleRequest = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Request not found' });
         }
         res.status(200).json({ success: true, data: scheduleReq });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+// ============================================================
+// VERSION MANAGEMENT & HOD APPROVAL
+// ============================================================
+
+// @desc    Get all versions for a department
+// @route   GET /api/timetable/versions/:department
+// @access  Private
+exports.getVersions = async (req, res) => {
+    try {
+        let query = { department: req.params.department };
+        if (req.user && req.user.role === 'student') {
+            query.status = 'approved';
+        }
+        
+        const versions = await GlobalScheduleRequest.find(query)
+            .sort({ createdAt: -1 })
+            .populate('generatedBy', 'name role');
+        res.status(200).json({ success: true, data: versions });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+// @desc    Submit version to HOD
+// @route   PUT /api/timetable/versions/:id/submit
+// @access  Private/Admin
+exports.submitVersion = async (req, res) => {
+    try {
+        const version = await GlobalScheduleRequest.findByIdAndUpdate(
+            req.params.id,
+            { status: 'pending' },
+            { new: true }
+        );
+        res.status(200).json({ success: true, data: version });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+// @desc    Approve version
+// @route   PUT /api/timetable/versions/:id/approve
+// @access  Private/HOD
+exports.approveVersion = async (req, res) => {
+    try {
+        // First, mark any currently approved version for this department/semester as generated/archived
+        const version = await GlobalScheduleRequest.findById(req.params.id);
+        if (!version) return res.status(404).json({ success: false, error: 'Version not found' });
+
+        await GlobalScheduleRequest.updateMany(
+            { department: version.department, academicYear: version.academicYear, semester: version.semester, status: 'approved' },
+            { status: 'generated' }
+        );
+
+        // Clear active Timetables for this department/semester and replace with approved ones
+        await Timetable.deleteMany({ department: version.department, academicYear: version.academicYear, semester: version.semester });
+
+        if (version.result) {
+            for (const [key, schedule] of Object.entries(version.result)) {
+                await Timetable.create({
+                    academicYear: version.academicYear, 
+                    semester: version.semester, 
+                    department: version.department,
+                    schedule: schedule,
+                    generatedBy: req.user.id
+                });
+            }
+        }
+
+        version.status = 'approved';
+        version.feedback = null;
+        await version.save();
+
+        res.status(200).json({ success: true, data: version });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+// @desc    Reject version
+// @route   PUT /api/timetable/versions/:id/reject
+// @access  Private/HOD
+exports.rejectVersion = async (req, res) => {
+    try {
+        const { feedback } = req.body;
+        const version = await GlobalScheduleRequest.findByIdAndUpdate(
+            req.params.id,
+            { status: 'rejected', feedback },
+            { new: true }
+        );
+        res.status(200).json({ success: true, data: version });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+// @desc    Delete a version
+// @route   DELETE /api/timetable/versions/:id
+// @access  Private/Admin/HOD
+exports.deleteVersion = async (req, res) => {
+    try {
+        const version = await GlobalScheduleRequest.findById(req.params.id);
+        if (!version) {
+            return res.status(404).json({ success: false, error: 'Version not found' });
+        }
+        await version.deleteOne();
+        res.status(200).json({ success: true, data: {} });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+// @desc    Regenerate a specific section in a version
+// @route   POST /api/timetable/versions/:id/regenerate-section
+// @access  Private/Admin
+exports.regenerateSection = async (req, res) => {
+    try {
+        const { section } = req.body;
+        const version = await GlobalScheduleRequest.findById(req.params.id);
+        
+        if (!version) {
+            return res.status(404).json({ success: false, error: 'Version not found' });
+        }
+
+        // Fetch current resources
+        const faculties = await Faculty.find();
+        const rooms = await Room.find();
+        const constraints = await BranchConstraints.findOne({ department: version.department }) || { fixedClasses: [], alternateClasses: [] };
+
+        // We only want to solve for this specific section
+        // We need to figure out which year this section belongs to
+        const yearMatch = version.years.find(y => {
+            const yearSections = version.sections[y] || [];
+            return yearSections.includes(section);
+        });
+
+        if (!yearMatch) {
+            return res.status(400).json({ success: false, error: `Section ${section} not found in this version configuration.` });
+        }
+
+        const payload = {
+            faculties,
+            rooms,
+            subjectMappings: version.subjectMappings,
+            fixedClasses: constraints.fixedClasses || [],
+            alternateClasses: constraints.alternateClasses || [],
+            resourceCaps: constraints.resourceCaps || { lectureHalls: 5, labs: 3 },
+            years: [yearMatch],
+            sections: { [yearMatch]: [section] }
+        };
+
+        const pythonResponse = await axios.post('http://localhost:5001/api/generate-branch', payload, { timeout: 60000 });
+
+        if (pythonResponse.data.status === 'success') {
+            // Update only the specific section in the result
+            const newResults = { ...version.result };
+            newResults[section] = pythonResponse.data.data[section];
+            
+            version.result = newResults;
+            version.status = 'draft'; // Reset to draft if it was something else
+            await version.save();
+
+            res.status(200).json({ success: true, data: version.result });
+        } else {
+            res.status(500).json({ success: false, error: 'Solver failed to regenerate section' });
+        }
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }

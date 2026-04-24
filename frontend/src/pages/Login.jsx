@@ -38,6 +38,7 @@ const LoginPage = () => {
     admin: { email: 'admin@acadplan.edu', password: 'admin123' },
     hod: { email: 'hod@acadplan.edu', password: 'hod123' },
     faculty: { email: 'faculty@acadplan.edu', password: 'faculty123' },
+    student: { email: '1602-24-737-001', password: 'Student#123' },
   };
 
   const handleDemoLogin = () => {
@@ -86,17 +87,20 @@ const LoginPage = () => {
                   <SelectItem value="admin">Administrator</SelectItem>
                   <SelectItem value="hod">HOD (Department Head)</SelectItem>
                   <SelectItem value="faculty">Faculty Member</SelectItem>
+                  <SelectItem value="student">Student</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Email Input */}
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
+              <Label htmlFor="email" className="text-sm font-medium">
+                {role === 'student' ? 'Roll Number' : 'Email Address'}
+              </Label>
               <Input 
                 id="email" 
-                type="email" 
-                placeholder="name@college.edu" 
+                type="text" 
+                placeholder={role === 'student' ? "1602-XX-737-XXX" : "name@college.edu"} 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required 

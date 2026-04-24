@@ -35,8 +35,16 @@ const GlobalScheduleRequestSchema = new mongoose.Schema({
     subjectMappings: [SubjectMappingSchema],
     status: {
         type: String,
-        enum: ['draft', 'pending', 'generated', 'approved', 'failed'],
+        enum: ['draft', 'pending', 'generated', 'approved', 'failed', 'rejected'],
         default: 'draft'
+    },
+    versionName: {
+        type: String,
+        default: 'Unnamed Version'
+    },
+    feedback: {
+        type: String,
+        default: null
     },
     result: {
         type: mongoose.Schema.Types.Mixed,   // Multi-year schedule or bottleneck analysis

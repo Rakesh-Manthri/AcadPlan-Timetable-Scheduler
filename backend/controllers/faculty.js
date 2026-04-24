@@ -26,3 +26,42 @@ exports.createFaculty = async (req, res, next) => {
         res.status(400).json({ success: false, error: err.message });
     }
 };
+
+// @desc    Get current faculty profile
+// @route   GET /api/faculty/me
+// @access  Private/Faculty
+exports.getProfile = async (req, res, next) => {
+    try {
+        const faculty = await Faculty.findOne({ user: req.user.id });
+        if (!faculty) {
+            return res.status(404).json({ success: false, error: 'Faculty profile not found' });
+        }
+        res.status(200).json({ success: true, data: faculty });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+// @desc    Update current faculty profile
+// @route   PUT /api/faculty/me
+// @access  Private/Faculty
+exports.updateProfile = async (req, res, next) => {
+    try {
+        const { education, publications, conferences } = req.body;
+        
+        let faculty = await Faculty.findOne({ user: req.user.id });
+        if (!faculty) {
+            return res.status(404).json({ success: false, error: 'Faculty profile not found' });
+        }
+
+        faculty = await Faculty.findByIdAndUpdate(
+            faculty._id,
+            { education, publications, conferences },
+            { new: true, runValidators: true }
+        );
+
+        res.status(200).json({ success: true, data: faculty });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};

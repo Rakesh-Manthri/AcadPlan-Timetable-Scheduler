@@ -2,78 +2,85 @@
 @plugin "tailwindcss-animate";
 @import "@fontsource-variable/geist";
 
-@variant dark (&:where(.dark, .dark *));
+@variant dark (&:where(.dark,.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.98 0.005 240);
+  --foreground: oklch(0.2 0.02 240);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.2 0.02 240);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --popover-foreground: oklch(0.2 0.02 240);
+  --primary: oklch(0.45 0.15 250);
+  --primary-foreground: oklch(0.98 0.005 240);
+  --secondary: oklch(0.93 0.02 250);
+  --secondary-foreground: oklch(0.2 0.02 240);
+  --muted: oklch(0.95 0.01 240);
+  --muted-foreground: oklch(0.5 0.03 240);
+  --accent: oklch(0.93 0.04 250);
+  --accent-foreground: oklch(0.2 0.02 240);
+  --destructive: oklch(0.6 0.18 25);
+  --destructive-foreground: oklch(0.98 0.005 240);
+  --border: oklch(0.9 0.01 240);
+  --input: oklch(0.9 0.01 240);
+  --ring: oklch(0.45 0.15 250);
+  --radius: 0.75rem;
   
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.99 0.005 240);
+  --sidebar-foreground: oklch(0.2 0.02 240);
+  --sidebar-primary: oklch(0.45 0.15 250);
+  --sidebar-primary-foreground: oklch(0.98 0.005 240);
+  --sidebar-accent: oklch(0.95 0.02 250);
+  --sidebar-accent-foreground: oklch(0.2 0.02 240);
+  --sidebar-border: oklch(0.92 0.01 240);
 }
 
+/* 
+  REWRITTEN DARK MODE: 
+  Optimized for high-density academic data grids (WCAG AA Compliant) 
+*/
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0.05 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Deep Blue-Gray Background for depth without pure black fatigue */
+  --background: oklch(0.14 0.015 240); 
+  --foreground: oklch(0.98 0.005 240);
+
+  /* Elevated surfaces for cards and modals */
+  --card: oklch(0.18 0.02 240);
+  --card-foreground: oklch(0.98 0.005 240);
+  --popover: oklch(0.18 0.02 240);
+  --popover-foreground: oklch(0.98 0.005 240);
+
+  /* Primary color shifted for better vibrance on dark background */
+  --primary: oklch(0.7 0.12 250);
+  --primary-foreground: oklch(0.14 0.015 240);
+
+  /* Secondary and Muted surfaces for grid headers and empty slots */
+  --secondary: oklch(0.25 0.03 240);
+  --secondary-foreground: oklch(0.98 0.005 240);
+  --muted: oklch(0.22 0.02 240);
+  
+  /* Muted Foreground increased to 0.8 lightness to ensure paper titles and descriptions are legible */
+  --muted-foreground: oklch(0.82 0.01 240); 
+
+  --accent: oklch(0.28 0.04 250);
+  --accent-foreground: oklch(0.98 0.005 240);
+
+  --destructive: oklch(0.62 0.17 25);
+  --destructive-foreground: oklch(0.98 0.005 240);
+
+  /* Borders darkened slightly for subtle hierarchy in the timetable grid */
+  --border: oklch(0.28 0.02 240);
+  --input: oklch(0.28 0.02 240);
+  --ring: oklch(0.7 0.12 250);
+  
+  /* Sidebar refinements for professional UI feel */
+  --sidebar: oklch(0.12 0.015 240);
+  --sidebar-foreground: oklch(0.9 0.01 240);
+  --sidebar-primary: oklch(0.7 0.12 250);
+  --sidebar-primary-foreground: oklch(0.12 0.015 240);
+  --sidebar-accent: oklch(0.2 0.02 240);
+  --sidebar-accent-foreground: oklch(0.98 0.005 240);
+  --sidebar-border: oklch(0.22 0.02 240);
 }
 
 @theme inline {
@@ -107,7 +114,6 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
-  --sidebar-ring: var(--sidebar-ring);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -124,20 +130,65 @@
   }
 }
 
+@layer utilities {
+ .glass {
+    @apply bg-background/60 backdrop-blur-md border border-border/50;
+  }
+ .glass-card {
+    @apply bg-card/60 backdrop-blur-md border border-border/50 shadow-xl;
+  }
+}
+
 @media print {
-  .no-print {
+  .no-print,
+  aside,
+  nav,
+  button,
+  [data-slot="tabs-list"] {
     display: none !important;
   }
-  body {
+
+  html, body {
     background: white !important;
     color: black !important;
+    font-size: 11px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    zoom: 0.85; /* Ensures the table fits perfectly on one landscape page */
   }
-  .print-page {
-    padding: 0 !important;
-    margin: 0 !important;
+
+  /* Remove all layout constraints so the grid fills the page */
+  main, .flex-1, [class*="overflow"] {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    position: static !important;
   }
-  .timetable-card {
-    border: 1px solid #ddd !important;
+
+  /* Make the grid container full-width without scroll */
+  [class*="min-w-"] {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Force the timetable grid to fill the page width */
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  /* Cards should have thin borders, no shadows */
+  [class*="shadow"], [class*="rounded"] {
     box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Ensure each section starts on a new page when printing all */
+  .print-break {
+    page-break-before: always;
+  }
+
+  @page {
+    size: landscape;
+    margin: 5mm;
   }
 }

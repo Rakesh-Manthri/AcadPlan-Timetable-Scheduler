@@ -45,6 +45,22 @@ const FacultySchema = new mongoose.Schema({
             Mon: true, Tue: true, Wed: true, Thu: true, Fri: true, Sat: true
         }
     },
+    education: [{
+        level: String,
+        university: String,
+        year: Number,
+        specialization: String
+    }],
+    publications: [{
+        title: String,
+        journal: String,
+        date: Date,
+        category: { type: String, enum: ['Article', 'Conference', 'Journal', 'Book Chapter'], default: 'Article' }
+    }],
+    conferences: {
+        attended: { type: Number, default: 0 },
+        presented: { type: Number, default: 0 }
+    },
     user: {
         type: mongoose.Schema.ObjectId,
         ref: 'User'

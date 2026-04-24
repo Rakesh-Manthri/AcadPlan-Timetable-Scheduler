@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Printer, Download, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const TIME_SLOTS = [
@@ -15,10 +17,7 @@ const TIME_SLOTS = [
   '03:20 - 04:20',
 ];
 
-import { Printer, Download, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-
-const TimetableGrid = ({ courses = [] }) => {
+const TimetableGrid = ({ courses = [], readOnly = false, highlightBatch = null, title = null }) => {
   const handlePrint = () => {
     window.print();
   };
@@ -52,122 +51,141 @@ const TimetableGrid = ({ courses = [] }) => {
     });
   };
 
-
   return (
-    <div className="w-full">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Weekly Timetable</h1>
-          <p className="text-muted-foreground">Information Technology - Section B</p>
+    <div className="w-full animate-in fade-in duration-500">
+      {title && (
+        <div className="hidden print:block text-center mb-6 border-b-2 border-black pb-4">
+          <h1 className="text-3xl font-black uppercase tracking-widest">{title}</h1>
         </div>
-        <div className="flex gap-4 no-print">
-          <Button variant="outline" size="sm" className="gap-2" onClick={handlePrint}>
+      )}
+      <div className="mb-6 flex items-center justify-between no-print">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">Weekly Grid</h2>
+          <p className="text-sm text-muted-foreground">Orientation: Days (Vertical) × Time (Horizontal)</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-2 rounded-lg" onClick={handlePrint}>
             <Printer className="h-4 w-4" /> Print
           </Button>
-          <Badge variant="outline" className="px-3 py-1 bg-secondary border-border">
-            Academic Year: 2025-26
-          </Badge>
-          <Badge className="px-3 py-1 bg-primary text-primary-foreground">
-            Semester: V
-          </Badge>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-        <div className="min-w-[1000px] grid grid-cols-7 border-b border-border bg-muted/50">
-          <div className="p-4 text-sm font-bold text-center border-r border-border">Time Slot</div>
-          {DAYS.map((day) => (
-            <div key={day} className="p-4 text-sm font-bold text-center border-r border-border last:border-r-0">
-              {day}
+      <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-lg print:border-none print:shadow-none">
+        <div className="min-w-[1200px]">
+          {/* Header Row: Time Slots */}
+          <div className="grid grid-cols-8 border-b border-border bg-muted/40">
+            <div className="p-4 text-xs font-bold uppercase tracking-wider text-center border-r border-border bg-muted/50">
+              Day / Time
             </div>
-          ))}
-        </div>
-
-        <div className="min-w-[1000px] grid grid-cols-7 relative">
-          {TIME_SLOTS.map((slot, timeIdx) => (
-            <React.Fragment key={slot}>
-              {/* Time Column */}
-              <div className="p-4 text-xs font-medium text-center bg-muted/30 border-r border-b border-border flex items-center justify-center">
+            {TIME_SLOTS.map((slot, idx) => (
+              <div 
+                key={slot} 
+                className={cn(
+                  "p-4 text-[10px] font-bold text-center border-r border-border last:border-r-0 flex flex-col items-center justify-center gap-1",
+                  idx === 3 && "bg-secondary/20 text-secondary-foreground"
+                )}
+              >
+                <span className="text-muted-foreground uppercase text-[8px] font-black">Slot {idx + 1}</span>
                 {slot}
               </div>
+            ))}
+          </div>
 
-              {/* Day Columns */}
-              {DAYS.map((day) => {
+          {/* Data Rows: Days */}
+          {DAYS.map((day) => (
+            <div key={day} className="grid grid-cols-8 border-b border-border last:border-b-0">
+              {/* Day Name Column */}
+              <div className="p-4 bg-muted/30 border-r border-border flex items-center justify-center">
+                <span className="text-sm font-black uppercase tracking-widest rotate-0 lg:-rotate-90 lg:whitespace-nowrap">
+                  {day}
+                </span>
+              </div>
+
+              {/* Time Slots for the Day */}
+              {TIME_SLOTS.map((slot, timeIdx) => {
+                const isLunch = timeIdx === 3;
                 const course = getSlotCourse(day, timeIdx);
                 const spans = isPartOfSpan(day, timeIdx);
-                const isLunch = timeIdx === 3;
 
                 if (isLunch) {
-                  return day === 'Mon' ? (
+                  return (
                     <div 
                       key={`${day}-${timeIdx}`} 
-                      className="col-span-6 bg-secondary/30 p-4 border-b border-border flex items-center justify-center italic text-muted-foreground text-sm tracking-widest uppercase"
+                      className="bg-secondary/10 border-r border-border last:border-r-0 p-4 flex items-center justify-center overflow-hidden"
                     >
-                      Lunch Break
+                      <div className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/40 whitespace-nowrap rotate-0">
+                        LUNCH
+                      </div>
                     </div>
-                  ) : null;
+                  );
                 }
 
-                if (spans) return null; // Skip rendering cells that are covered by a rowSpan-like logic
+                if (spans) return null;
 
                 return (
                   <div 
                     key={`${day}-${timeIdx}`} 
                     className={cn(
-                      "group relative p-1 border-r border-b border-border last:border-r-0 min-h-[80px] transition-colors hover:bg-muted/10",
-                      course?.span > 1 && `row-span-${course.span}`
+                      "relative p-1 border-r border-border last:border-r-0 min-h-[100px] transition-colors hover:bg-muted/5 group",
+                      course?.span > 1 && `col-span-${course.span}`
                     )}
-                    style={course?.span > 1 ? { gridRow: `span ${course.span} / span ${course.span}` } : {}}
+                    style={course?.span > 1 ? { gridColumn: `span ${course.span} / span ${course.span}` } : {}}
                   >
                     {course ? (
                       <Card className={cn(
-                        "h-full p-2 text-xs flex flex-col justify-between border shadow-sm transition-transform group-hover:scale-[1.02]",
+                        "h-full p-2.5 text-[11px] flex flex-col justify-between border-2 shadow-sm transition-all group-hover:shadow-md group-hover:border-primary/30",
                         course.isConflict 
-                          ? "border-destructive bg-destructive/5 text-destructive-foreground ring-1 ring-destructive" 
-                          : "border-border bg-card"
+                          ? "border-destructive bg-destructive/5 text-destructive ring-1 ring-destructive/20" 
+                          : "border-border/50 bg-card",
+                        highlightBatch && course.subject?.includes(highlightBatch) && "border-primary bg-primary/5 ring-1 ring-primary",
+                        highlightBatch && (course.subject?.includes('B1') || course.subject?.includes('B2')) && !course.subject?.includes(highlightBatch) && "opacity-30 grayscale"
                       )}>
-                        <div className="space-y-1">
-                          <div className="flex justify-between items-start">
-                            <span className="font-bold underline decoration-primary/30 underline-offset-2">
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-start gap-1">
+                            <span className="font-extrabold leading-tight">
                               {course.subject}
                             </span>
                             {course.isConflict && (
-                              <Badge variant="destructive" className="h-4 px-1 text-[8px] uppercase">
-                                Conflict
-                              </Badge>
+                              <AlertCircle className="h-3 w-3 text-destructive shrink-0" />
                             )}
                           </div>
-                          <p className="text-muted-foreground font-medium">{course.faculty}</p>
+                          <p className="text-[10px] text-muted-foreground font-semibold line-clamp-1">{course.faculty}</p>
                         </div>
-                        <div className="mt-2 flex items-center justify-between opacity-80">
-                          <span className="flex items-center gap-1 font-mono uppercase bg-secondary px-1 rounded">
+                        <div className="mt-2 pt-2 border-t border-border/40 flex items-center justify-between gap-1">
+                          <Badge variant="secondary" className="h-4 px-1 text-[9px] font-mono rounded-sm">
                             {course.room}
+                          </Badge>
+                          <span className="text-[9px] italic text-muted-foreground font-medium uppercase tracking-tighter">
+                            {course.type}
                           </span>
-                          <span className="italic">{course.type}</span>
                         </div>
                       </Card>
                     ) : (
-                      <div className="h-full w-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-muted-foreground">
-                        Empty Slot
+                      <div className="h-full w-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-[9px] text-muted-foreground uppercase font-black tracking-widest transition-opacity">
+                        FREE
                       </div>
                     )}
                   </div>
                 );
               })}
-            </React.Fragment>
+            </div>
           ))}
         </div>
       </div>
       
       {/* Legend */}
-      <div className="mt-6 flex gap-6 text-sm text-muted-foreground">
+      <div className="mt-8 flex flex-wrap gap-6 text-[10px] font-bold uppercase tracking-wider text-muted-foreground no-print">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-destructive shadow-sm" />
-          <span>Constraint Violation</span>
+          <div className="w-4 h-4 rounded bg-destructive/10 border-2 border-destructive" />
+          <span>Constraint Conflict</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-card border shadow-sm" />
-          <span>Normal Lecture</span>
+          <div className="w-4 h-4 rounded bg-card border-2 border-border" />
+          <span>Lecture / Lab</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-secondary/10 border border-border" />
+          <span>Recess / Lunch</span>
         </div>
       </div>
     </div>

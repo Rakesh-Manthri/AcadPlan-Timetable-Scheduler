@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate, Outlet } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
-  CalendarDays, 
-  Users, 
+  User, 
   MapPin, 
   Settings, 
   LogOut, 
@@ -12,10 +11,10 @@ import {
   LayoutDashboard,
   Moon,
   Sun,
-  Wand2
+  Wand2,
+  Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import Header from '@/components/dashboard/Header';
 
 import authService from '@/services/authService';
 
@@ -27,11 +26,11 @@ const DashboardLayout = () => {
   const role = user?.role || 'faculty';
 
   const navItems = [
-    { title: 'Timetable Grid', icon: CalendarDays, href: '/dashboard' },
-    { title: 'Generate Wizard', icon: Wand2, href: '/dashboard/generate', roles: ['admin', 'hod'] },
-    { title: 'Faculty Management', icon: Users, href: '/dashboard/faculty', roles: ['admin', 'hod'] },
+    { title: role === 'student' ? 'My Timetable' : 'Schedule Gallery', icon: Layers, href: '/dashboard' },
+    { title: 'My Profile', icon: User, href: '/dashboard/profile', roles: ['hod', 'faculty'] },
+    { title: 'Timetable Generator', icon: Wand2, href: '/dashboard/generate', roles: ['admin'] },
+    { title: 'Faculty Management', icon: User, href: '/dashboard/faculty', roles: ['admin', 'hod'] },
     { title: 'Room Allocation', icon: MapPin, href: '/dashboard/rooms', roles: ['admin'] },
-    { title: 'Settings', icon: Settings, href: '/dashboard/settings' },
   ];
 
   const filteredNavItems = navItems.filter(item => 
@@ -48,7 +47,7 @@ const DashboardLayout = () => {
   };
 
   return (
-    <div className={cn("flex h-screen bg-background overflow-hidden", isDarkMode && 'dark')}>
+    <div className={cn("flex h-screen bg-background text-foreground overflow-hidden", isDarkMode && 'dark')}>
       {/* Mobile Sidebar Overlay */}
       {!isSidebarOpen && (
         <Button 
@@ -127,16 +126,16 @@ const DashboardLayout = () => {
             </Button>
 
             {/* Profile Card */}
-            <div className="flex items-center gap-3 px-3 py-2 bg-secondary/50 rounded-lg">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+            <div className="flex items-center gap-3 px-3 py-3 bg-secondary/40 backdrop-blur-sm rounded-xl border border-border/40">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-bold text-primary ring-1 ring-primary/20">
                 {user?.name?.[0] || 'U'}
               </div>
               <div className="overflow-hidden">
-                <p className="text-sm font-semibold truncate leading-none mb-1">
+                <p className="text-sm font-bold truncate leading-none mb-1 text-foreground">
                   {user?.name || 'User'}
                 </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {user?.email || 'user@acadplan.edu'}
+                <p className="text-[10px] uppercase tracking-tighter text-muted-foreground font-bold">
+                  {user?.role || 'FACULTY'}
                 </p>
               </div>
             </div>
@@ -155,9 +154,18 @@ const DashboardLayout = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header for Desktop and Mobile */}
-        <Header onLogout={handleLogout} />
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        {/* Mobile Sidebar Toggle (Floating when sidebar is closed) */}
+        {!isSidebarOpen && (
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="lg:hidden absolute top-4 left-4 z-50 bg-card/80 backdrop-blur-sm border shadow-lg rounded-full"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        )}
         
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8">

@@ -29,6 +29,32 @@ const scheduleService = {
   getRequest: async (id) => {
     const response = await api.get(`/timetable/request/${id}`);
     return response.data;
+  },
+
+  // Version Management
+  getVersions: async (department) => {
+    const response = await api.get(`/timetable/versions/${department}`);
+    return response.data;
+  },
+  submitVersion: async (id) => {
+    const response = await api.put(`/timetable/versions/${id}/submit`);
+    return response.data;
+  },
+  approveVersion: async (id) => {
+    const response = await api.put(`/timetable/versions/${id}/approve`);
+    return response.data;
+  },
+  rejectVersion: async (id, feedback) => {
+    const response = await api.put(`/timetable/versions/${id}/reject`, { feedback });
+    return response.data;
+  },
+  deleteVersion: async (id) => {
+    const response = await api.delete(`/timetable/versions/${id}`);
+    return response.data;
+  },
+  regenerateSection: async (id, section) => {
+    const response = await api.post(`/timetable/versions/${id}/regenerate-section`, { section });
+    return response.data;
   }
 };
 

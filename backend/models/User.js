@@ -21,6 +21,11 @@ const UserSchema = new mongoose.Schema({
         enum: ['admin', 'hod', 'faculty'],
         default: 'faculty'
     },
+    facultyId: {
+        type: mongoose.Schema.ObjectId,
+        ref: 'Faculty',
+        default: null
+    },
     password: {
         type: String,
         required: [true, 'Please add a password'],
@@ -44,7 +49,7 @@ UserSchema.pre('save', async function(next) {
 
 // Sign JWT and return
 UserSchema.methods.getSignedJwtToken = function() {
-    return jwt.sign({ id: this._id, role: this.role }, process.env.JWT_SECRET, {
+    return jwt.sign({ id: this._id, role: this.role, facultyId: this.facultyId }, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRE
     });
 };

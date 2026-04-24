@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import scheduleService from '@/services/timetableService';
 import facultyService from '@/services/facultyService';
 import courseService from '@/services/courseService';
+import roomsService from '@/services/roomsService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,8 +16,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  Wand2, Plus, Trash2, Lock, RotateCcw, BookOpen, ChevronRight, ChevronLeft, Loader2, Download
+  Wand2, Plus, Trash2, Lock, RotateCcw, BookOpen, ChevronRight, ChevronLeft, Loader2, Download, RefreshCcw, ArrowRightLeft, Building2
 } from 'lucide-react';
+import TimetableGrid from '@/components/dashboard/TimetableGrid';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const SLOT_LABELS = [
@@ -58,6 +60,7 @@ const GenerateWizard = () => {
   const [bottleneck, setBottleneck] = useState(null);
   const [dbFaculty, setDbFaculty] = useState([]);
   const [dbCourses, setDbCourses] = useState({});
+  const [dbRooms, setDbRooms] = useState([]);
   const [selectedSemester, setSelectedSemester] = useState('');
 
   // ---- STEP 1: Subject-Faculty Mapping ----
@@ -74,18 +77,27 @@ const GenerateWizard = () => {
   // ---- STEP 4: Resource Caps ----
   const [resourceCaps, setResourceCaps] = useState({ lectureHalls: 5, labs: 3 });
   const [department, setDepartment] = useState('IT');
-  const [years, setYears] = useState([2, 3, 4]);
-  const [sections, setSections] = useState(['A']);
+  const [years, setYears] = useState([1, 2, 3, 4]);
+  const [sections, setSections] = useState(['A', 'B', 'C']);
+
+  // ---- Section → Lecture Hall Mapping ----
+  const [sectionHalls, setSectionHalls] = useState({});
+
+  // ---- Generation History (for picking sections from different runs) ----
+  const [generationHistory, setGenerationHistory] = useState([]);
+  const [previewSection, setPreviewSection] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [facRes, courseRes] = await Promise.all([
+        const [facRes, courseRes, roomsRes] = await Promise.all([
           facultyService.getAll(),
-          courseService.getBySemester('IT')
+          courseService.getBySemester('IT'),
+          roomsService.getAll()
         ]);
         setDbFaculty(facRes.data || []);
         setDbCourses(courseRes.data || {});
+        setDbRooms(roomsRes.data || []);
       } catch (e) { /* ignore */ }
     };
     fetchData();
@@ -125,16 +137,30 @@ const GenerateWizard = () => {
     // Map semester number to year: sem 1,2 -> year 1; sem 3,4 -> year 2; sem 5,6 -> year 3; sem 7,8 -> year 4
     const yearMap = { 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4 };
     const year = yearMap[sem] || 3;
-    const mapped = courses.map(c => ({
-      subject: c.name,
-      faculty: '',
-      weeklyHours: c.weeklyHours,
-      type: c.type,
-      year,
-      section: 'A'
-    }));
-    setSubjectMappings(mapped);
-    toast.success(`Loaded ${mapped.length} courses from Semester ${sem}`);
+    const mapped = [];
+    ['A', 'B', 'C'].forEach(section => {
+      courses.forEach(c => {
+        mapped.push({
+          subject: c.name,
+          faculty: '',
+          weeklyHours: c.weeklyHours,
+          type: c.type,
+          year,
+          section
+        });
+      });
+    });
+    setSubjectMappings(prev => {
+      // Remove placeholder if it's the only one and empty
+      if (prev.length === 1 && prev[0].subject === '') return mapped;
+      return [...prev, ...mapped];
+    });
+    toast.success(`Loaded ${mapped.length} courses from Semester ${sem} (Sections A, B, C)`);
+  };
+
+  const clearMappings = () => {
+    setSubjectMappings([{ subject: '', faculty: '', weeklyHours: 3, type: 'Lecture', year: 3, section: 'A' }]);
+    setSelectedSemester('');
   };
 
   // ---- Fixed Class Handlers ----
@@ -205,11 +231,19 @@ const GenerateWizard = () => {
         years,
         sections,
         subjectMappings: validMappings,
+        sectionHalls,
       });
 
       if (response.success) {
         setResult(response.data);
+        setGenerationHistory(prev => [
+          ...prev,
+          { id: Date.now(), label: `Run ${prev.length + 1}`, data: response.data, requestId: response.requestId }
+        ]);
         setStep(4); // Jump to preview
+        // Auto-select first section for preview
+        const firstSec = Object.keys(response.data)[0] || '';
+        setPreviewSection(firstSec);
         toast.success('Schedule generated successfully!');
       } else {
         setBottleneck(response.bottleneck);
@@ -226,6 +260,107 @@ const GenerateWizard = () => {
     }
   };
 
+  // ---- REGENERATE (re-run with same config) ----
+  const handleRegenerate = async () => {
+    setIsGenerating(true);
+    setBottleneck(null);
+    try {
+      const validMappings = subjectMappings.filter(m => m.subject && m.faculty);
+      await scheduleService.saveConstraints(department, { fixedClasses, alternateClasses, resourceCaps });
+      const response = await scheduleService.generateBranch({
+        department,
+        academicYear: '2025-26',
+        semester: 'Even',
+        years,
+        sections,
+        subjectMappings: validMappings,
+      });
+      if (response.success) {
+        setResult(response.data);
+        setGenerationHistory(prev => [
+          ...prev,
+          { id: Date.now(), label: `Run ${prev.length + 1}`, data: response.data, requestId: response.requestId }
+        ]);
+        const firstSec = Object.keys(response.data)[0] || '';
+        setPreviewSection(firstSec);
+        toast.success('Re-generated successfully! Compare and pick sections below.');
+      } else {
+        setBottleneck(response.bottleneck);
+        toast.error(response.error || 'Regeneration failed');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Regeneration failed');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // ---- Pick a section's timetable from a specific generation run ----
+  const handlePickSection = (sectionKey, runId) => {
+    const run = generationHistory.find(r => r.id === runId);
+    if (!run || !run.data[sectionKey]) {
+      toast.error('Section data not found in that run.');
+      return;
+    }
+    setResult(prev => ({
+      ...prev,
+      [sectionKey]: run.data[sectionKey]
+    }));
+    toast.success(`Picked ${sectionKey} timetable from ${run.label}`);
+  };
+
+  // ---- Regenerate only the currently selected section ----
+  const [isRegeneratingSection, setIsRegeneratingSection] = useState(false);
+  const handleRegenerateSection = async (sectionKey) => {
+    setIsRegeneratingSection(true);
+    try {
+      const validMappings = subjectMappings.filter(m => m.subject && m.faculty);
+      // Figure out which year this section belongs to
+      const yearMatch = years.find(y => sectionKey.startsWith(`Y${y}-`));
+      const secLetter = sectionKey.split('-')[1]; // e.g. "A" from "Y2-A"
+      if (!yearMatch || !secLetter) {
+        toast.error('Could not parse section identifier');
+        return;
+      }
+      // Filter mappings to only this section
+      const sectionMappings = validMappings.filter(m => m.year === yearMatch && m.section === secLetter);
+      if (sectionMappings.length === 0) {
+        toast.error(`No subject mappings found for ${sectionKey}`);
+        return;
+      }
+
+      await scheduleService.saveConstraints(department, { fixedClasses, alternateClasses, resourceCaps });
+      const response = await scheduleService.generateBranch({
+        department,
+        academicYear: '2025-26',
+        semester: 'Even',
+        years: [yearMatch],
+        sections: { [yearMatch]: [secLetter] },
+        subjectMappings: sectionMappings,
+      });
+
+      if (response.success && response.data[sectionKey]) {
+        // Update only this section in the current result
+        setResult(prev => ({
+          ...prev,
+          [sectionKey]: response.data[sectionKey]
+        }));
+        // Also log as a partial run in history
+        setGenerationHistory(prev => [
+          ...prev,
+          { id: Date.now(), label: `Run ${prev.length + 1} (${sectionKey})`, data: { ...result, [sectionKey]: response.data[sectionKey] }, requestId: response.requestId }
+        ]);
+        toast.success(`${sectionKey} regenerated successfully!`);
+      } else {
+        toast.error(`Failed to regenerate ${sectionKey}`);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || `Failed to regenerate ${sectionKey}`);
+    } finally {
+      setIsRegeneratingSection(false);
+    }
+  };
+
   const stepTitles = ['Subject-Faculty Mapping', 'Fixed Classes', 'Alternate Classes', 'Resources & Generate', 'Preview'];
 
   return (
@@ -235,7 +370,7 @@ const GenerateWizard = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <Wand2 className="h-8 w-8 text-primary" />
-            Generation Wizard
+            Timetable Generator
           </h1>
           <p className="text-muted-foreground mt-1">Configure constraints and generate a complete branch schedule.</p>
         </div>
@@ -277,7 +412,7 @@ const GenerateWizard = () => {
           <CardContent className="space-y-4">
             {/* Semester Quick-Fill */}
             <div className="flex flex-wrap items-center gap-2">
-              <Label className="text-sm font-medium">Auto-fill from Semester:</Label>
+              <Label className="text-sm font-medium mr-2">Auto-fill from Semester:</Label>
               {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
                 <Button
                   key={sem}
@@ -288,67 +423,89 @@ const GenerateWizard = () => {
                   Sem {sem}
                 </Button>
               ))}
+              <Button variant="ghost" size="sm" onClick={clearMappings} className="text-destructive hover:text-destructive ml-4">
+                <Trash2 className="h-4 w-4 mr-2" /> Clear All
+              </Button>
             </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Faculty</TableHead>
-                    <TableHead>Hours/Week</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Year</TableHead>
-                    <TableHead>Section</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {subjectMappings.map((row, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell>
-                        <Input placeholder="e.g. DBMS" value={row.subject} onChange={e => updateSubjectRow(idx, 'subject', e.target.value)} />
-                      </TableCell>
-                      <TableCell>
-                        <Select value={row.faculty} onValueChange={v => updateSubjectRow(idx, 'faculty', v)}>
-                          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Select faculty" /></SelectTrigger>
-                          <SelectContent>
-                            {dbFaculty.map(f => <SelectItem key={f._id} value={f.name}>{f.name}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell><Input type="number" min={1} max={6} value={row.weeklyHours} onChange={e => updateSubjectRow(idx, 'weeklyHours', e.target.value)} className="w-20" /></TableCell>
-                      <TableCell>
-                        <Select value={row.type} onValueChange={v => updateSubjectRow(idx, 'type', v)}>
-                          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Lecture">Lecture</SelectItem>
-                            <SelectItem value="Lab">Lab</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select value={String(row.year)} onValueChange={v => updateSubjectRow(idx, 'year', v)}>
-                          <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">1st</SelectItem>
-                            <SelectItem value="2">2nd</SelectItem>
-                            <SelectItem value="3">3rd</SelectItem>
-                            <SelectItem value="4">4th</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Input value={row.section} onChange={e => updateSubjectRow(idx, 'section', e.target.value)} className="w-16" />
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => removeSubjectRow(idx)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-6">
+              {Object.entries(
+                subjectMappings.reduce((acc, row, idx) => {
+                  const key = `Year ${row.year || '?'} - Section ${row.section || '?'}`;
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push({ ...row, originalIndex: idx });
+                  return acc;
+                }, {})
+              ).map(([groupKey, rows]) => (
+                <div key={groupKey} className="border rounded-lg overflow-hidden shadow-sm">
+                  <div className="bg-muted/60 px-4 py-2 font-semibold text-sm border-b text-primary">
+                    {groupKey}
+                  </div>
+                  <div className="overflow-x-auto bg-card">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Subject</TableHead>
+                          <TableHead>Faculty</TableHead>
+                          <TableHead>Hours/Week</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Year</TableHead>
+                          <TableHead>Section</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rows.map((row) => {
+                          const idx = row.originalIndex;
+                          return (
+                            <TableRow key={idx}>
+                              <TableCell>
+                                <Input placeholder="e.g. DBMS" value={row.subject} onChange={e => updateSubjectRow(idx, 'subject', e.target.value)} />
+                              </TableCell>
+                              <TableCell>
+                                <Select value={row.faculty} onValueChange={v => updateSubjectRow(idx, 'faculty', v)}>
+                                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Select faculty" /></SelectTrigger>
+                                  <SelectContent>
+                                    {dbFaculty.map(f => <SelectItem key={f._id} value={f.name}>{f.name}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell><Input type="number" min={1} max={6} value={row.weeklyHours} onChange={e => updateSubjectRow(idx, 'weeklyHours', e.target.value)} className="w-20" /></TableCell>
+                              <TableCell>
+                                <Select value={row.type} onValueChange={v => updateSubjectRow(idx, 'type', v)}>
+                                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Lecture">Lecture</SelectItem>
+                                    <SelectItem value="Lab">Lab</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select value={String(row.year)} onValueChange={v => updateSubjectRow(idx, 'year', v)}>
+                                  <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="1">1st</SelectItem>
+                                    <SelectItem value="2">2nd</SelectItem>
+                                    <SelectItem value="3">3rd</SelectItem>
+                                    <SelectItem value="4">4th</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Input value={row.section} onChange={e => updateSubjectRow(idx, 'section', e.target.value)} className="w-16" />
+                              </TableCell>
+                              <TableCell>
+                                <Button variant="ghost" size="sm" onClick={() => removeSubjectRow(idx)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ))}
             </div>
             <Button variant="outline" onClick={addSubjectRow} className="gap-2">
               <Plus className="h-4 w-4" /> Add Subject
@@ -499,6 +656,48 @@ const GenerateWizard = () => {
               </div>
             </div>
 
+            {/* Section → Lecture Hall Assignment */}
+            <Card className="border-primary/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /> Section → Lecture Hall</CardTitle>
+                <CardDescription>Assign a fixed lecture hall for each section. This room will be used for all lectures of that section.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {years.flatMap(y =>
+                    (Array.isArray(sections) ? sections : []).map(sec => {
+                      const key = `Y${y}-${sec}`;
+                      return (
+                        <div key={key} className="flex items-center gap-2">
+                          <Badge variant="outline" className="w-16 justify-center shrink-0 font-mono">{key}</Badge>
+                          <Select
+                            value={sectionHalls[key] || ''}
+                            onValueChange={v => setSectionHalls(prev => ({ ...prev, [key]: v }))}
+                          >
+                            <SelectTrigger className="h-9 flex-1">
+                              <SelectValue placeholder="Select Hall" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {dbRooms.filter(r => {
+                                if (r.type !== 'Lecture Hall') return false;
+                                // Hide if this room is already selected by another section
+                                const isSelectedByOther = Object.entries(sectionHalls).some(([k, v]) => v === r.roomId && k !== key);
+                                return !isSelectedByOther;
+                              }).map(room => (
+                                <SelectItem key={room.roomId} value={room.roomId}>
+                                  {room.roomId}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Summary */}
             <Card className="bg-muted/30">
               <CardContent className="pt-6">
@@ -564,78 +763,125 @@ const GenerateWizard = () => {
       )}
 
       {/* ================================================================ */}
-      {/* STEP 5: Preview & Approval (Conflict Heatmap) */}
+      {/* STEP 5: Preview, Regenerate & Section Picker */}
       {/* ================================================================ */}
       {step === 4 && result && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Generated Schedule Preview</h2>
-            <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50 px-3 py-1">
-              All {Object.keys(result).length} grids generated
-            </Badge>
+          {/* Header with regenerate */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold">Generated Schedule Preview</h2>
+              <p className="text-muted-foreground text-sm">Review, regenerate, or pick sections from different runs.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleRegenerate}
+                disabled={isGenerating}
+                className="gap-2"
+              >
+                {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                {isGenerating ? 'Regenerating...' : 'Regenerate'}
+              </Button>
+              <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50 px-3 py-1 self-center">
+                {Object.keys(result).length} grids · {generationHistory.length} run{generationHistory.length !== 1 ? 's' : ''}
+              </Badge>
+            </div>
           </div>
 
-          {Object.entries(result).map(([gridKey, entries]) => (
-            <Card key={gridKey} className="overflow-hidden">
+          {/* Section Tabs */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Select Section</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2 flex-wrap">
+                {Object.keys(result).map(sec => (
+                  <Button
+                    key={sec}
+                    variant={previewSection === sec ? 'default' : 'outline'}
+                    onClick={() => setPreviewSection(sec)}
+                    size="sm"
+                  >
+                    {sec}
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Current Section Grid */}
+          {previewSection && result[previewSection] && (
+            <Card className="overflow-hidden">
               <CardHeader className="bg-muted/30 pb-3">
-                <CardTitle className="text-lg">{gridKey}</CardTitle>
-                <CardDescription>{entries.length} slots filled</CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-muted/50">
-                        <th className="p-2 border text-left font-semibold w-20">Day / Slot</th>
-                        {SLOT_LABELS.map((s, i) => (
-                          <th key={i} className="p-2 border text-center font-medium">{s}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {DAYS.map(day => (
-                        <tr key={day}>
-                          <td className="p-2 border font-semibold bg-muted/20">{day.slice(0, 3)}</td>
-                          {SLOT_LABELS.map((slotLabel, gridIdx) => {
-                            // Handle lunch break column
-                            if (gridIdx === 3) {
-                              return (
-                                <td key={gridIdx} className="p-1.5 border text-center bg-secondary/30 italic text-muted-foreground text-[10px] tracking-wide">
-                                  🍽️
-                                </td>
-                              );
-                            }
-                            const sIdx = solverIdxFromGrid(gridIdx);
-                            const entry = entries.find(e => e.day === day && e.slot_idx === sIdx);
-                            const bgColor = entry
-                              ? entry.type === 'Fixed' ? 'bg-amber-100 dark:bg-amber-900/30'
-                              : entry.type === 'Alternate' ? 'bg-purple-100 dark:bg-purple-900/30'
-                              : entry.type === 'Special' ? 'bg-blue-100 dark:bg-blue-900/30'
-                              : entry.type === 'Lab' ? 'bg-green-100 dark:bg-green-900/30'
-                              : 'bg-sky-50 dark:bg-sky-900/20'
-                              : '';
-                            return (
-                              <td key={gridIdx} className={`p-1.5 border text-center ${bgColor}`}>
-                                {entry ? (
-                                  <div>
-                                    <p className="font-semibold leading-tight">{entry.subject}</p>
-                                    {entry.faculty && <p className="text-muted-foreground">{entry.faculty}</p>}
-                                    {entry.room && <p className="text-muted-foreground">{entry.room}</p>}
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground/40">—</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-lg">{previewSection}</CardTitle>
+                    <CardDescription>{result[previewSection].length} slots filled{sectionHalls[previewSection] ? ` · Hall: ${sectionHalls[previewSection]}` : ''}</CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => handleRegenerateSection(previewSection)}
+                    disabled={isRegeneratingSection || isGenerating}
+                  >
+                    {isRegeneratingSection ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                    {isRegeneratingSection ? 'Regenerating...' : `Regenerate ${previewSection}`}
+                  </Button>
                 </div>
+              </CardHeader>
+              <CardContent className="pt-4 overflow-x-auto">
+                <TimetableGrid courses={result[previewSection]} />
               </CardContent>
             </Card>
-          ))}
+          )}
+
+          {/* Section Picker from Multiple Runs */}
+          {generationHistory.length > 1 && previewSection && (
+            <Card className="border-primary/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ArrowRightLeft className="h-4 w-4 text-primary" />
+                  Pick Section from Different Runs
+                </CardTitle>
+                <CardDescription>
+                  You have {generationHistory.length} generation runs. Pick the best version of <strong>{previewSection}</strong> from any run.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {generationHistory.map(run => {
+                  const secData = run.data[previewSection];
+                  if (!secData) return null;
+                  const isActive = JSON.stringify(result[previewSection]) === JSON.stringify(secData);
+                  return (
+                    <div
+                      key={run.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                        isActive ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border hover:border-primary/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Badge variant={isActive ? 'default' : 'outline'} className="font-mono">{run.label}</Badge>
+                        <span className="text-sm text-muted-foreground">{secData.length} slots filled</span>
+                        {isActive && <Badge className="bg-green-100 text-green-800 border-green-300 text-[10px]">ACTIVE</Badge>}
+                      </div>
+                      {!isActive && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePickSection(previewSection, run.id)}
+                          className="gap-1"
+                        >
+                          <ArrowRightLeft className="h-3 w-3" /> Use This
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Legend */}
           <div className="flex flex-wrap gap-3 text-xs">

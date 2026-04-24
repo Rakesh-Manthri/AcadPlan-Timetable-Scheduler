@@ -27,7 +27,7 @@ class BranchSolver:
     """
 
     def __init__(self, faculties, rooms, subject_mappings, fixed_classes,
-                 alternate_classes, resource_caps, years, sections, config):
+                 alternate_classes, resource_caps, years, sections, section_halls, config):
         self.faculties = faculties
         self.rooms = rooms
         self.subject_mappings = subject_mappings
@@ -36,6 +36,7 @@ class BranchSolver:
         self.resource_caps = resource_caps
         self.years = years
         self.sections = sections
+        self.section_halls = section_halls or {}
         self.config = config
         self.days = config['schedule']['days']
         self.slots = [s for s in config['schedule']['slots'] if not s['is_break']]
@@ -197,6 +198,15 @@ class BranchSolver:
                 lab_subjects.add(e['subject'])
         return len(lab_subjects)
 
+    def _count_active_sessions(self, day, slot_idx, session_type):
+        """Count how many sessions of a specific type are running globally at the same time."""
+        count = 0
+        for grid in self.grids.values():
+            for e in grid:
+                if e['day'] == day and e['slot_idx'] == slot_idx and e['type'] == session_type:
+                    count += 1
+        return count
+
     def wave3_normals(self):
         """Use backtracking to fill remaining normal subjects."""
         # Build the task list: for each year/section, figure out which subjects
@@ -242,6 +252,8 @@ class BranchSolver:
 
         # Get compatible rooms
         compatible_rooms = []
+        fixed_hall = getattr(self, 'section_halls', {}).get(grid_key, '')
+
         for r in self.rooms:
             r_id = r.get('roomId', r.get('_id', ''))
             r_type = r.get('type', '')
@@ -249,6 +261,11 @@ class BranchSolver:
                 continue
             if course_type == 'Lecture' and r_type in ('Computer Lab', 'Specialized Lab'):
                 continue
+            
+            # Enforce fixed lecture hall for this section if set
+            if course_type == 'Lecture' and fixed_hall and r_id != fixed_hall:
+                continue
+
             compatible_rooms.append(r)
 
         shuffled_days = list(self.days)
@@ -263,6 +280,15 @@ class BranchSolver:
                 # Skip if slot is already taken
                 if self._is_slot_taken(grid_key, day, s_idx):
                     continue
+
+                # Check branch-wide Resource Caps
+                active_count = self._count_active_sessions(day, s_idx, course_type)
+                if course_type == 'Lecture':
+                    if active_count >= self.resource_caps.get('lectureHalls', 5):
+                        continue
+                elif course_type == 'Lab':
+                    if active_count >= self.resource_caps.get('labs', 3):
+                        continue
 
                 # Faculty global availability check
                 if not self._is_faculty_free(day, s_idx, faculty):
@@ -509,12 +535,13 @@ def generate_branch():
     resource_caps = data.get('resourceCaps', {})
     years = data.get('years', [2, 3, 4])
     sections = data.get('sections', ['A'])
+    section_halls = data.get('sectionHalls', {})
 
     config = load_config()
 
     solver = BranchSolver(
         faculties, rooms, subject_mappings, fixed_classes,
-        alternate_classes, resource_caps, years, sections, config
+        alternate_classes, resource_caps, years, sections, section_halls, config
     )
 
     result = solver.solve()
