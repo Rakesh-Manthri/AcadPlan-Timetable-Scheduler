@@ -274,6 +274,7 @@ const GenerateWizard = () => {
         years,
         sections,
         subjectMappings: validMappings,
+        sectionHalls,
       });
       if (response.success) {
         setResult(response.data);
@@ -335,8 +336,9 @@ const GenerateWizard = () => {
         academicYear: '2025-26',
         semester: 'Even',
         years: [yearMatch],
-        sections: { [yearMatch]: [secLetter] },
+        sections: [secLetter],
         subjectMappings: sectionMappings,
+        sectionHalls,
       });
 
       if (response.success && response.data[sectionKey]) {
