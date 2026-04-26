@@ -11,12 +11,23 @@ import {
   DialogFooter,
   DialogDescription
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const FacultyForm = ({ open, onOpenChange, onSubmit, faculty = null }) => {
   const [formData, setFormData] = useState({
+    employeeId: '',
     name: '',
+    email: '',
+    designation: 'Assistant Professor',
+    qualifications: '',
     department: '',
     specialization: '',
     maxWeeklyLoad: 16,
@@ -28,14 +39,32 @@ const FacultyForm = ({ open, onOpenChange, onSubmit, faculty = null }) => {
   useEffect(() => {
     if (faculty) {
       setFormData({
+        employeeId: faculty.employeeId || '',
         name: faculty.name || '',
+        email: faculty.email || '',
+        designation: faculty.designation || 'Assistant Professor',
+        qualifications: faculty.qualifications || '',
         department: faculty.department || '',
         specialization: Array.isArray(faculty.specialization) ? faculty.specialization.join(', ') : faculty.specialization || '',
         maxWeeklyLoad: faculty.maxWeeklyLoad || 16,
         availability: faculty.availability || { Mon: true, Tue: true, Wed: true, Thu: true, Fri: true, Sat: true }
       });
+    } else if (open) {
+      setFormData({
+        employeeId: '',
+        name: '',
+        email: '',
+        designation: 'Assistant Professor',
+        qualifications: '',
+        department: '',
+        specialization: '',
+        maxWeeklyLoad: 16,
+        availability: {
+          Mon: true, Tue: true, Wed: true, Thu: true, Fri: true, Sat: true
+        }
+      });
     }
-  }, [faculty]);
+  }, [faculty, open]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -58,7 +87,7 @@ const FacultyForm = ({ open, onOpenChange, onSubmit, faculty = null }) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{faculty ? 'Edit Faculty' : 'Add New Faculty'}</DialogTitle>
           <DialogDescription>
@@ -69,6 +98,15 @@ const FacultyForm = ({ open, onOpenChange, onSubmit, faculty = null }) => {
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
+              <Label htmlFor="employeeId">Employee ID</Label>
+              <Input 
+                id="employeeId" 
+                value={formData.employeeId} 
+                onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
+                placeholder="e.g. EMP-001"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
               <Input 
                 id="name" 
@@ -78,12 +116,48 @@ const FacultyForm = ({ open, onOpenChange, onSubmit, faculty = null }) => {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input 
+                id="email" 
+                type="email"
+                value={formData.email} 
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                placeholder="faculty@college.edu"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="designation">Designation</Label>
+              <Select 
+                value={formData.designation} 
+                onValueChange={(v) => setFormData({...formData, designation: v})}
+              >
+                <SelectTrigger id="designation">
+                  <SelectValue placeholder="Select designation" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Professor & HOD">Professor & HOD</SelectItem>
+                  <SelectItem value="Professor">Professor</SelectItem>
+                  <SelectItem value="Associate Professor">Associate Professor</SelectItem>
+                  <SelectItem value="Assistant Professor">Assistant Professor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="dept">Department</Label>
               <Input 
                 id="dept" 
                 value={formData.department} 
                 onChange={(e) => setFormData({...formData, department: e.target.value})}
                 required 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="qualifications">Qualifications</Label>
+              <Input 
+                id="qualifications" 
+                value={formData.qualifications} 
+                onChange={(e) => setFormData({...formData, qualifications: e.target.value})}
+                placeholder="e.g. Ph.D, M.Tech"
               />
             </div>
           </div>
