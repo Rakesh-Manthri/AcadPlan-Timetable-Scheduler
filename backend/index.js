@@ -22,8 +22,10 @@ const app = express();
 app.use(express.json());
 
 // Enable CORS
-app.use(cors());
-
+app.use(cors({
+    origin: process.env.FRONTEND_URL || '*',
+    credentials: true
+}));
 // Mount routers
 app.use('/api/auth', auth);
 app.use('/api/faculty', faculty);

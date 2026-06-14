@@ -31,7 +31,7 @@ exports.generateTimetable = async (req, res, next) => {
             { subject: 'Database Systems', faculty: faculties[0].name, type: 'Lecture' }
         ];
 
-        const pythonResponse = await axios.post('http://localhost:5001/api/generate', {
+        const pythonResponse = await axios.post(`${process.env.SCHEDULER_URL}/api/generate`, {
             faculties, rooms, courses
         });
 
@@ -136,7 +136,7 @@ exports.generateBranchSchedule = async (req, res) => {
         });
 
         // Call the Python solver with all the data
-        const pythonResponse = await axios.post('http://localhost:5001/api/generate-branch', {
+        const pythonResponse = await axios.post(`${process.env.SCHEDULER_URL}/api/generate-branch`, {
             faculties,
             rooms,
             subjectMappings,
@@ -345,8 +345,7 @@ exports.regenerateSection = async (req, res) => {
             sections: { [yearMatch]: [section] }
         };
 
-        const pythonResponse = await axios.post('http://localhost:5001/api/generate-branch', payload, { timeout: 60000 });
-
+        const pythonResponse = await axios.post(`${process.env.SCHEDULER_URL}/api/generate-branch`, payload, { timeout: 60000 });
         if (pythonResponse.data.status === 'success') {
             // Update only the specific section in the result
             const newResults = { ...version.result };

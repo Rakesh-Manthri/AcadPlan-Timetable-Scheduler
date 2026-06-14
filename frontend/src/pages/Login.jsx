@@ -35,9 +35,9 @@ const LoginPage = () => {
   };
 
   const demoCredentials = {
-    admin: { email: 'admin@acadplan.edu', password: 'admin123' },
-    hod: { email: 'hod@acadplan.edu', password: 'hod123' },
-    faculty: { email: 'faculty@acadplan.edu', password: 'faculty123' },
+    admin: { email: 'admin@vce.ac.in', password: 'password' },
+    hod: { email: 'krmrao@staff.vce.ac.in', password: '12345678' },
+    faculty: { email: 'keziarani@staff.vce.ac.in', password: '12345678' },
     student: { email: '1602-24-737-001', password: 'Student#123' },
   };
 
@@ -161,7 +161,7 @@ const LoginPage = () => {
           </div>
           <div className="w-full pt-3 border-t border-border/50">
             <p className="text-xs text-muted-foreground text-center">
-              © 2024 AcadPlan. All rights reserved.
+              © 2026 AcadPlan. All rights reserved.
             </p>
           </div>
         </CardFooter>
